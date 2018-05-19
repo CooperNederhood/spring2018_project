@@ -5,11 +5,13 @@ import scipy.misc as misc
 from matplotlib import pyplot as plt 
 import pandas as pd 
 import timeit 
+import os
+
 
 # hardcoded path is temporary
 PATH = "/home/cooper/Documents/spring2018_project/data/satellite/nigeria2013"
 
-IMG_SIZE = 34
+IMG_SIZE = 128
 FROM_CENTER = int(IMG_SIZE / 2)
 
 class SatDataObs():
@@ -19,7 +21,7 @@ class SatDataObs():
 	is at 30m resolution.
 	"""
 
-	IMG_SIZE = 34
+	IMG_SIZE = 128
 	FROM_CENTER = int(IMG_SIZE / 2)
 	OBS = 0
 
@@ -79,11 +81,11 @@ class SatDataObs():
 		self.bin_lum = b 
 
 
-	def save_extract(self, landsat_array):
+	def save_extract(self, landsat_array, save_at):
 		'''
 		Saves out the corresponding extraction but from the 
 		landsat image array in landsat_array. Saves the image
-		under the corresponding bin subfolder
+		under the corresponding location in save_at
 		'''
 
 		r0 = self.c_row - SatDataObs.FROM_CENTER
@@ -96,7 +98,7 @@ class SatDataObs():
 
 		filename = "obs_{}.png".format(self.obs_num)
 
-		misc.imsave(arr=extract, name=PATH+"/y2013/"+str(self.bin_lum)+"/"+filename)
+		misc.imsave(arr=extract, name=save_at+"/"+filename)
 
 
 
@@ -113,6 +115,16 @@ def sample_from_image(image_array, source_file, N):
 	'''
 	Given a np image_array, returns a list of N
 	SatDataObs objects sampled from the image_array
+
+	Inputs:	
+		-image_array: (np array) of a NIGHTLIGHTS photo from which we sample
+		-source_file: (string) of the LANDSAT file name for image_array
+		-N: (int) sample count to draw
+
+	Returns:
+		- rand_images: (list) of N SatDataObs instances
+		- lum: (np array - N length) of luminisoty scores
+		- lum_bin: (np array - N length) of luminisoty score bins
 	'''
 
 	shape = image_array.shape
@@ -141,6 +153,59 @@ def sample_from_image(image_array, source_file, N):
 	return rand_images, lum, lum_bin
 
 
+def build_test_validate_train(image_array, landsat_array, source_file, counts_dict, zero_factor, save_at):
+	'''
+	Given a desired count structure for the training, validation, and
+	testing size, samples accordingly from the image_array and builds
+	the requisite folder structure for Keras
+
+	Inputs:
+		-image_array: LUMINOSITY we are sampling from
+		-landsat_array: corresponding LANDSAT array
+		-source_file: name of source file for luminosity array
+		-counts_dict: counts for training, validation, test data
+		-zero_factor: int describing rate to filter zero lum observations
+		-save_at: directory to build the dataset
+	'''
+
+	train_count = counts_dict['training']
+	test_count = counts_dict['validation']
+	valid_count = counts_dict['test']
+
+	total = train_count + test_count + valid_count 
+	samples, mean_lum, bin_lum = sample_from_image(image_array, source_file, total*zero_factor)
+
+	for t in counts_dict:
+		for level in ["1", "2", "3"]:
+
+			if not os.path.exists(save_at+t+"/"+level):
+				os.makedirs(save_at+t+"/"+level)
+
+	c = 0
+	added_c = 0
+
+	final_sample = []
+	for pic in samples:
+
+		if pic.mean_lum != 0 or np.mod(c, zero_factor) != 0:
+			pic.obs_num = added_c
+			final_sample.append(pic)
+
+			added_c += 1
+
+		c += 1
+
+	for final_pic in final_sample[0:train_count]:
+		final_pic.save_extract(landsat_array, save_at+"training/"+str(final_pic.bin_lum))
+
+	for final_pic in final_sample[train_count: train_count+valid_count]:
+		final_pic.save_extract(landsat_array, save_at+"validation/"+str(final_pic.bin_lum))
+
+	for final_pic in final_sample[train_count+valid_count: total]:
+		final_pic.save_extract(landsat_array, save_at+"test/"+str(final_pic.bin_lum))
+
+
+
 def visualize_sample(lum_counts):
 	'''
 	Returns a pyplot of the mean luminosity
@@ -154,7 +219,6 @@ def visualize_sample(lum_counts):
 
 if __name__ == "__main__":
 
-	sample_count = 10000
 
 	nl_file = 'DMSPNL_2013GEO2.tif'
 	landsat_file = 'landsat_2013GEO2.tif'
@@ -162,33 +226,8 @@ if __name__ == "__main__":
 	nl_2013 = tiff.imread(PATH+"/"+nl_file)
 	landsat_2013 = tiff.imread(PATH+"/"+landsat_file)
 
-	samples, mean_lum, bin_lum = sample_from_image(nl_2013, nl_file, sample_count)
+	structure = {'training': 1000, 'validation': 500, 'test': 500}
 
-
-	t0 = timeit.default_timer()
-	zero_factor = 4
-	c = 0
-	added_c = 0
-
-	for pic in samples:
-		begin = timeit.default_timer()
-
-		if pic.mean_lum != 0 or np.mod(c, zero_factor) != 0:
-			print("Adding pic:")
-			print(pic)
-			pic.save_extract(landsat_2013)
-
-			elapsed_time = timeit.default_timer() - begin
-			print("Took {} seconds".format(elapsed_time))
-			print()
-
-			added_c += 1
-
-		c += 1
-
-	total = timeit.default_timer() - t0
-	print()
-	print("#######################")
-	print("Elapsed time to add {} of {} sample = {} minutes".format(added_c, sample_count, total/60))
+	build_test_validate_train(nl_2013, landsat_2013, nl_file, structure, 4, "lagos/")
 
 
