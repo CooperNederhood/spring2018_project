@@ -22,8 +22,13 @@ model.add(layers.Flatten())
 model.add(layers.Dense(512, activation='relu'))
 model.add(layers.Dense(3, activation='softmax'))
 
+
+
 from keras import optimizers
 model.compile(loss='categorical_crossentropy', optimizer=optimizers.RMSprop(lr=1e-4), metrics=['acc'])
+
+
+
 
 from keras.preprocessing.image import ImageDataGenerator
 

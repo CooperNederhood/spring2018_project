@@ -2,7 +2,7 @@ import fiona
 import pandas as pd 
 import skimage.external.tifffile as tiff
 
-# hardcoded path is temporary
+# data paths
 DATA = "../data"
 DHS = DATA+"/DHS/unzipped/"
 SAT = DATA+"/satellite/"
@@ -82,12 +82,12 @@ def gen_DHS(year, file_DHS, file_GPS):
     df = df_DHS[ keep_DHS ].merge(df_GPS, how='left', left_on='hv001', right_on='DHSCLUST')
 
     # gen summary dataframe
-    df_means = df[ ['hv001', 'hv271', 'LATNUM', 'LONGNUM'] ].groupby('hv001').mean()
-    df_size = df['hv001'].value_counts()
+    #df_means = df[ ['hv001', 'hv271', 'LATNUM', 'LONGNUM'] ].groupby('hv001').mean()
+    #df_size = df['hv001'].value_counts()
 
-    summ_stats = df_means.merge(pd.DataFrame(df_size), how='left', left_index=True, right_index=True)
+    #summ_stats = df_means.merge(pd.DataFrame(df_size), how='left', left_index=True, right_index=True)
 
-    return df, summ_stats
+    return df
 
 def write_EE_points(year, file, ee_script_name):
     '''
@@ -180,12 +180,21 @@ def do_EE_analysis():
 
     write_EE_points(y, gps_file, "ee_gps.txt")
 
-
-if __name__ == '__main__':
+def do_GPS_tiff_do_csv():
+    '''
+    Actual lines of analysis run
+    '''
 
     gps_tiff = "DHS_GPS.tif"
     gps_csv_file = "DHS_GPS.csv"
 
     GPS_tiff_to_csv(gps_tiff, gps_csv_file)
 
+if __name__ == '__main__':
+
+    year = 2013
+    file_DHS = "NGHR6AFL.DTA"
+    file_GPS = "NGGE6AFL.shp"
+
+    df = gen_DHS(year, file_DHS, file_GPS)
 
