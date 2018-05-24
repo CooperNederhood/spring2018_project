@@ -9,6 +9,7 @@ from keras import backend as K
 import os
 import scipy.misc as misc
 import numpy as np
+import pandas as pd 
 
 DATA = "../../data"
 DHS = DATA+"/DHS/unzipped/"
@@ -42,9 +43,11 @@ def build_features(reg_folder, pic_size,  model_h5):
 	folders = [x for x in os.listdir(reg_path) if ".csv" not in x]
 
 	output_dict = {}
+	print("There are {} cluster sub-folders in path {}".format(len(folders), reg_path))
 
 	for cluster in folders:
 		all_pics = os.listdir(reg_path+"/"+cluster)
+		print("\tsubfolder {} contains {} pics".format(cluster, len(all_pics)))
 
 		pics_array = np.empty( (len(all_pics), pic_size, pic_size, 3) )
 		row = 0
@@ -57,19 +60,25 @@ def build_features(reg_folder, pic_size,  model_h5):
 			pics_array[row] = im 
 			row += 1
 
-		feature_vecs = get_features( [pic_size, 0] )[0]
+		feature_vecs = get_features( [pics_array, 0] )[0]
+		print("\t\tdim of feature_vecs: ", feature_vecs.shape)
 
-		avg_feature = feature_vecs.mean(axis=1)
+		avg_feature = feature_vecs.mean(axis=0)
+		print("\t\tdim of avg_feature: ", avg_feature.shape)
+		print()
 
-		output_dict['cluster'] = avg_feature
+		output_dict[cluster] = avg_feature
 
+		df = pd.DataFrame.from_dict(output_dict, orient='index')
 
-	return output_dict
+		df.to_csv("output/" + model_h5 + "/cluster_features.csv")
+
+	return df 
 
 if __name__ == '__main__':
 	
-	reg = "size34"
-	size = 34
-	mod = "mod_1"
+	reg = "size128"
+	size = 128
+	mod = "mod_1_BIG"
 
 	x = build_features(reg, size, mod)
